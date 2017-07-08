@@ -33,24 +33,62 @@ class BooksApp extends React.Component {
     searchResults: []
     }
 
+  // get only the fields that we want
+  getBookInfo = (bookRaw) => {
+    var r = {
+      'title': bookRaw.title,
+      'cover_url': bookRaw.imageLinks.thumbnail,
+      'shelf': bookRaw.shelf,
+      'id': bookRaw.id
+    }
+    if (bookRaw.authors) {
+      r['author'] = bookRaw.authors.join(", ")
+    } else {
+      r['author'] = 'Unknown'
+    }
+    return r
+  }
+
+  // initialize the data
+  componentDidMount() {
+    BooksAPI.getAll().then((books) => {
+        console.log(books)
+        if ("error" in books) {
+          this.setState({ myBooks: []
+          })
+          return
+        }
+        // map the results to books objects
+        let result = books.map( (book) => this.getBookInfo(book) );
+
+        // save the search "shelf" into the variable
+        this.setState({
+          myBooks: result
+        })
+      })
+    }
+
+  // get all the books that belong to a specific shelf
   getShelfBooks = (shelfId) => {
     var ret = this.state.myBooks.filter((book) => book.shelf===shelfId)
 
     return ret || []
   }
 
-  changeShelf = (shelf, book) => {
-    var objIndex = this.state.myBooks.findIndex((item => item.title === book.title));
+  // update local database with the new book setup
+  updateLocal = (book, shelf) => {
+    var objIndex = this.state.myBooks.findIndex((item => item.id === book.id));
 
     // check if it updating or removing
     if (objIndex>-1) {
+      // the book is on my shelf already. Update to the new shelf
       this.setState((state) => {
           state.myBooks[objIndex].shelf = shelf
       })
     } else {
       if (shelf) {
-        // remove from the search and add to the shelf
-        objIndex = this.state.searchResults.findIndex((item => item.title === book.title));
+        // not in my books. remove from the search and add to the shelf
+        objIndex = this.state.searchResults.findIndex((item => item.id === book.id));
         book.shelf = shelf
 
         // add object
@@ -67,18 +105,35 @@ class BooksApp extends React.Component {
     }
   }
 
+  // change the shelf remotely and locally only if the remote was done
+  changeShelf = (shelf, book) => {
+    // update the server and continue only if it was ok
+    BooksAPI.update(book, shelf).then( (ret) => {
+      console.log(ret)
+      if ("error" in ret) {
+        window.alert("Error updating remotely");
+        return
+      }
+
+      // update locally
+      this.updateLocal(book, shelf)
+    })
+  }
+
+  resetSearch = () => {
+    this.setState({ searchResults: []
+    })
+  }
   searchMovie = (query) => {
     // reset if query is empty
     if (query ==='') {
-      this.setState({ searchResults: {
-        'name': 'Search Results',
-        'books': []
-      }})
+      this.resetSearch()
       return
     }
 
     // search for the book
     BooksAPI.search(query, 10).then( (books) => {
+      //console.log(books)
       if ("error" in books) {
         this.setState({ searchResults: []
         })
@@ -89,7 +144,8 @@ class BooksApp extends React.Component {
           var r = {
             'title': book.title,
             'cover_url': book.imageLinks.thumbnail,
-            'shelf': 'none'
+            'shelf': book.shelf,
+            'id': book.id
           }
           if (book.authors) {
             r['author'] = book.authors.join(", ")
