@@ -7,31 +7,25 @@ import BookShelfComponent from './components/BookShelfComponent'
 
 class BooksApp extends React.Component {
   state = {
-    /**
-     * TODO: Instead of using this state variable to keep track of which page
-     * we're on, use the URL in the browser's address bar. This will ensure that
-     * users can use the browser's back and forward buttons to navigate between
-     * pages, as well as provide a good URL they can bookmark and share.
-     */
-    showSearchPage: false,
-    availableBooks:[],
-    shelves: [
-           {
-             'id':'currentlyReading',
-             'name':'Reading now'
-           },
-           {
-             'id':'read',
-             'name':'Already read'
-           },
-           {
-             'id':'wantToRead',
-             'name':'Want to Read'
-           }
-         ],
     myBooks: [],
     searchResults: []
     }
+
+  // the libs I have
+  shelves = [
+         {
+           'id':'currentlyReading',
+           'name':'Reading now'
+         },
+         {
+           'id':'read',
+           'name':'Already read'
+         },
+         {
+           'id':'wantToRead',
+           'name':'Want to Read'
+         }
+       ]
 
   // get only the fields that we want
   getBookInfo = (bookRaw) => {
@@ -49,10 +43,10 @@ class BooksApp extends React.Component {
     return r
   }
 
-  // initialize the data
-  componentDidMount() {
+  // get my books from server
+  getMyBooks = () => {
     BooksAPI.getAll().then((books) => {
-        console.log(books)
+        //console.log(books)
         if ("error" in books) {
           this.setState({ myBooks: []
           })
@@ -61,70 +55,54 @@ class BooksApp extends React.Component {
         // map the results to books objects
         let result = books.map( (book) => this.getBookInfo(book) );
 
-        // save the search "shelf" into the variable
+        // save the search "shelf" into the variable and reset search
         this.setState({
-          myBooks: result
+          myBooks: result,
+          searchResults: []
         })
       })
+  }
+
+  // initialize the data
+  componentDidMount() {
+    this.getMyBooks()
     }
 
   // get all the books that belong to a specific shelf
   getShelfBooks = (shelfId) => {
     var ret = this.state.myBooks.filter((book) => book.shelf===shelfId)
-
     return ret || []
-  }
-
-  // update local database with the new book setup
-  updateLocal = (book, shelf) => {
-    var objIndex = this.state.myBooks.findIndex((item => item.id === book.id));
-
-    // check if it updating or removing
-    if (objIndex>-1) {
-      // the book is on my shelf already. Update to the new shelf
-      this.setState((state) => {
-          state.myBooks[objIndex].shelf = shelf
-      })
-    } else {
-      if (shelf) {
-        // not in my books. remove from the search and add to the shelf
-        objIndex = this.state.searchResults.findIndex((item => item.id === book.id));
-        book.shelf = shelf
-
-        // add object
-        this.setState((state) => {
-            state.myBooks.push(book)
-            state.searchResults.splice(objIndex, 1)
-        })
-      } else {
-        // remove object
-        this.setState((state) => {
-            state.myBooks.splice(objIndex, 1)
-        })
-      }
-    }
   }
 
   // change the shelf remotely and locally only if the remote was done
   changeShelf = (shelf, book) => {
     // update the server and continue only if it was ok
     BooksAPI.update(book, shelf).then( (ret) => {
-      console.log(ret)
+      //console.log(ret)
       if ("error" in ret) {
         window.alert("Error updating remotely");
         return
       }
 
       // update locally
-      this.updateLocal(book, shelf)
+      //this.updateLocal(book, shelf)
+      let objIndex = this.state.searchResults.findIndex((item => item.id === book.id));
+
+      // add object
+      this.setState((state) => {
+          state.searchResults.splice(objIndex, 1)
+      })
     })
   }
 
+  // set the search result to empty
   resetSearch = () => {
     this.setState({ searchResults: []
     })
   }
-  searchMovie = (query) => {
+
+  // get the books from server according to the search query
+  searchBook = (query) => {
     // reset if query is empty
     if (query ==='') {
       this.resetSearch()
@@ -139,21 +117,25 @@ class BooksApp extends React.Component {
         })
         return
       }
+
+      // create a map to speed up checking
+      let mbm = {}
+      this.state.myBooks.forEach( (book, idx) => { mbm[book.id] = idx; })
+
       // map the results to books objects
       let result = books.map( (book) => {
-          var r = {
-            'title': book.title,
-            'cover_url': book.imageLinks.thumbnail,
-            'shelf': book.shelf,
-            'id': book.id
+          // add the current state or the faulty search
+          // this is a bug in the API, where the books should have
+          // my state, not a random one.
+          let exists = book.id in mbm
+          console.log(exists)
+          if (!exists) {
+            return this.getBookInfo(book)
           }
-          if (book.authors) {
-            r['author'] = book.authors.join(", ")
-          } else {
-            r['author'] = 'Unknown'
+          else {
+            return this.state.myBooks[mbm[book.id]]
           }
-          return r
-        });
+        })
 
       // save the search "shelf" into the variable
       this.setState({
@@ -162,6 +144,13 @@ class BooksApp extends React.Component {
     })
   }
 
+  // returns to main screen
+  backFromSearch = () => {
+    this.
+    this.resetSearch()
+  }
+
+  // main funciton
   render() {
     return (
 
@@ -169,10 +158,10 @@ class BooksApp extends React.Component {
         <Route path='/search' render={() => (
           <div className="search-books">
             <div className="search-books-bar">
-              <Link className="close-search" to="/">Close</Link>
+              <Link className="close-search" onClick={() => this.backFromSearch()} to="/">Close</Link>
               <div className="search-books-input-wrapper">
                 <input type="text" placeholder="Search by title or author"
-                  onChange={(event) => this.searchMovie(event.target.value)}/>
+                  onChange={(event) => this.searchBook(event.target.value)}/>
               </div>
             </div>
             <div className="search-books-results">
@@ -192,7 +181,7 @@ class BooksApp extends React.Component {
               <h1>MyReads</h1>
             </div>
             <div className="list-books-content">
-                {this.state.shelves.map( (shelf)=> {
+                {this.shelves.map( (shelf)=> {
                   return (<BookShelfComponent
                           books={this.getShelfBooks(shelf.id)}
                           name={shelf.name}
