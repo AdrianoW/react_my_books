@@ -21,7 +21,7 @@ class BooksApp extends React.Component {
            'id':'read',
            'name':'Already read'
          },
-         {
+         { 
            'id':'wantToRead',
            'name':'Want to Read'
          }
