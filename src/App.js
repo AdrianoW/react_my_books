@@ -21,7 +21,7 @@ class BooksApp extends React.Component {
            'id':'read',
            'name':'Already read'
          },
-         { 
+         {
            'id':'wantToRead',
            'name':'Want to Read'
          }
@@ -74,6 +74,18 @@ class BooksApp extends React.Component {
     return ret || []
   }
 
+  updateLocal = (book, shelf) => {
+      let objIndex = this.state.myBooks.findIndex((item => item.id === book.id));
+
+      book.shelf = shelf
+      this.setState((state) => {
+          if(objIndex>1) {
+            state.myBooks.splice(objIndex, 1)
+          }
+          state.myBooks.push(book)
+      })
+  }
+
   // change the shelf remotely and locally only if the remote was done
   changeShelf = (shelf, book) => {
     // update the server and continue only if it was ok
@@ -85,7 +97,7 @@ class BooksApp extends React.Component {
       }
 
       // update locally
-      //this.updateLocal(book, shelf)
+      this.updateLocal(book, shelf)
       let objIndex = this.state.searchResults.findIndex((item => item.id === book.id));
 
       // add object
@@ -128,7 +140,6 @@ class BooksApp extends React.Component {
           // this is a bug in the API, where the books should have
           // my state, not a random one.
           let exists = book.id in mbm
-          console.log(exists)
           if (!exists) {
             return this.getBookInfo(book)
           }
@@ -146,7 +157,6 @@ class BooksApp extends React.Component {
 
   // returns to main screen
   backFromSearch = () => {
-    this.
     this.resetSearch()
   }
 
